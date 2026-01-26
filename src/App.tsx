@@ -51,26 +51,22 @@ const diagnosisInsights: Record<
     title: string;
     pattern: string;
     consequence: string;
-    quickWin: string;
   }
 > = {
   Soul: {
     title: "Your primary issue: SOUL",
     pattern: "Positioning is unclear, so the business keeps reacting instead of leading.",
     consequence: "Marketing feels generic and customers cannot repeat what you stand for.",
-    quickWin: "Write a one-paragraph point of view and test it on three real customers.",
   },
   Heart: {
     title: "Your primary issue: HEART",
     pattern: "The voice feels safe or distant, so trust takes too long to build.",
     consequence: "People do not connect emotionally and you lose momentum against bolder brands.",
-    quickWin: "Put a founder or expert front and centre in one piece of content this week.",
   },
   Hands: {
     title: "Your primary issue: HANDS",
     pattern: "Execution relies on firefighting, not a repeatable system.",
     consequence: "Quality and consistency wobble, which wastes effort and delays results.",
-    quickWin: "Define one owner, one cadence, and one metric for the next 30 days.",
   },
 };
 
@@ -558,7 +554,7 @@ const App = () => {
                           {diagnosisInsights[scores.primary].title}
                         </h3>
                         {severity ? (
-                          <p className="mt-2 text-sm text-white/60">
+                          <p className="mt-2 text-xs text-white/60">
                             Pattern: {getPattern(scores.primary, severity)}
                           </p>
                         ) : null}
