@@ -16,6 +16,12 @@ npm install
 npm run dev
 ```
 
+To run the API server in development (separate terminal):
+
+```bash
+npm run dev:server
+```
+
 ### Build for production
 
 ```bash
@@ -27,3 +33,8 @@ npm run build
 ```bash
 npm run preview
 ```
+
+## Render Web Service settings
+
+- Build Command: `npm install && npm run build`
+- Start Command: `npm start`
