@@ -84,6 +84,32 @@ export const getSeverityBand = (score: number): SeverityBand => {
   return "Critical";
 };
 
+export const getPattern = (primary: PillarKey, severity: SeverityBand): string => {
+  const isCritical = severity === "Critical" || severity === "Leaking";
+
+  if (primary === "Soul") {
+    return isCritical ? "Drifting Direction" : "Unclear Edge";
+  }
+
+  if (primary === "Heart") {
+    return isCritical ? "Safe Voice, Slow Trust" : "Invisible Expertise";
+  }
+
+  return isCritical ? "Heroics Over Systems" : "Inconsistent Engine";
+};
+
+export const getThirtyDayRule = (primary: PillarKey): string => {
+  if (primary === "Soul") {
+    return "For the next 30 days, publish one clear point of view every week that explains what you stand for and who you are not for.";
+  }
+
+  if (primary === "Heart") {
+    return "For the next 30 days, every piece of content must lead with a real person and a real opinion, not a slogan.";
+  }
+
+  return "For the next 30 days, pick one channel and ship on a fixed cadence using three repeatable templates.";
+};
+
 export const getLowestQuestions = (
   answers: Record<string, number>,
   count = 3,

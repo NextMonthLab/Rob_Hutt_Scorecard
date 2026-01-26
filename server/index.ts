@@ -19,12 +19,31 @@ app.get("/api/health", (_request, response) => {
 });
 
 app.post("/api/leads", (request, response) => {
-  const { email } = request.body ?? {};
+  const { email, answers, ...rest } = request.body ?? {};
 
   if (typeof email !== "string" || !emailRegex.test(email)) {
     response.status(400).json({ ok: false, error: "Valid email is required." });
     return;
   }
+
+  if (answers !== undefined) {
+    if (
+      !Array.isArray(answers) ||
+      answers.length !== 12 ||
+      !answers.every((answer) => typeof answer === "number")
+    ) {
+      response
+        .status(400)
+        .json({ ok: false, error: "Answers must be an array of 12 numbers." });
+      return;
+    }
+  }
+
+  console.log("New lead submission:", {
+    email,
+    answers,
+    ...rest,
+  });
 
   response.json({ ok: true, leadId: randomUUID() });
 });
