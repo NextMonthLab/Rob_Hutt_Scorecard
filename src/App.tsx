@@ -1,6 +1,12 @@
 import { useMemo, useRef, useState } from "react";
-import { questions } from "./data/questions";
-import { calculateScores, type PillarKey } from "./utils/scoring";
+import { questions, type Pillar } from "./data/questions";
+import {
+  calculateScores,
+  getLowestQuestions,
+  getSeverityBand,
+  type PillarKey,
+  type SeverityBand,
+} from "./utils/scoring";
 
 const scaleLabels = [
   "Strongly Disagree",
@@ -10,68 +16,59 @@ const scaleLabels = [
   "Strongly Agree",
 ];
 
-const diagnosisCopy: Record<
+const questionSections: Array<{
+  title: string;
+  subtitle: string;
+  pillar: Pillar;
+}> = [
+  {
+    title: "Soul",
+    subtitle: "Positioning and clarity",
+    pillar: "Soul",
+  },
+  {
+    title: "Heart",
+    subtitle: "Human presence and trust",
+    pillar: "Heart",
+  },
+  {
+    title: "Hands",
+    subtitle: "Execution and ownership",
+    pillar: "Hands",
+  },
+  {
+    title: "Alignment",
+    subtitle: "Strategy showing up in output",
+    pillar: "Alignment",
+  },
+];
+
+const diagnosisInsights: Record<
   PillarKey,
   {
     title: string;
-    paragraphs: string[];
-    looksLike: string[];
-    fixes: string[];
+    pattern: string;
+    consequence: string;
+    quickWin: string;
   }
 > = {
   Soul: {
     title: "Your primary issue: SOUL",
-    paragraphs: [
-      "When Soul scores lowest, your positioning is fuzzy and the business is reacting rather than leading. The market cannot tell what you stand for or who you are for, so marketing fails to compound.",
-      "Without a clear point of view, every campaign becomes a compromise. Teams chase trends, compare themselves to competitors, and avoid saying no, which makes everything feel generic.",
-      "Clarity is the engine. Once purpose, audience, and differentiation are crisp, the rest of the system starts to align and build momentum.",
-    ],
-    looksLike: [
-      "Messaging changes from month to month based on external pressure.",
-      "The team struggles to explain who you are not trying to win.",
-      "Marketing activity feels busy but undirected.",
-    ],
-    fixes: [
-      "Define the point of view and promise you will defend.",
-      "Choose a priority audience and be specific about their needs.",
-      "Write down the boundaries and the offers you will not pursue.",
-    ],
+    pattern: "Positioning is unclear, so the business keeps reacting instead of leading.",
+    consequence: "Marketing feels generic and customers cannot repeat what you stand for.",
+    quickWin: "Write a one-paragraph point of view and test it on three real customers.",
   },
   Heart: {
     title: "Your primary issue: HEART",
-    paragraphs: [
-      "When Heart is lowest, the marketing might be credible but it feels cold or invisible. Customers do not sense a real human voice, so trust takes too long to build.",
-      "Without empathy and presence, you sound like everyone else. It becomes harder to connect with motivations, fears, and frustrations, and the brand feels distant.",
-      "Human connection is the accelerator. When real people lead the story, attention grows and the right customers lean in.",
-    ],
-    looksLike: [
-      "Content sounds safe and committee-led.",
-      "Founders or experts are rarely seen or heard.",
-      "Customer insight is based on assumptions rather than stories.",
-    ],
-    fixes: [
-      "Build the narrative around real customer moments and language.",
-      "Put founders and experts front and centre in the marketing.",
-      "Create a distinct voice guide that sounds human and consistent.",
-    ],
+    pattern: "The voice feels safe or distant, so trust takes too long to build.",
+    consequence: "People do not connect emotionally and you lose momentum against bolder brands.",
+    quickWin: "Put a founder or expert front and centre in one piece of content this week.",
   },
   Hands: {
     title: "Your primary issue: HANDS",
-    paragraphs: [
-      "When Hands is lowest, the problem is execution and ownership. Marketing is not a system, so output depends on heroics and the quality is inconsistent.",
-      "Without clear workflows, measurement, and accountability, the team cannot repeat what works. This blocks compounding and causes constant fire drills.",
-      "A simple operating model turns effort into momentum. It makes quality predictable and frees time for strategic moves.",
-    ],
-    looksLike: [
-      "Marketing runs in last-minute scrambles or one-off pushes.",
-      "No single person owns the plan end to end.",
-      "Results are hard to measure or explain.",
-    ],
-    fixes: [
-      "Define ownership, cadence, and approval routes.",
-      "Build a small, repeatable content engine.",
-      "Agree on the basic metrics that show progress.",
-    ],
+    pattern: "Execution relies on firefighting, not a repeatable system.",
+    consequence: "Quality and consistency wobble, which wastes effort and delays results.",
+    quickWin: "Define one owner, one cadence, and one metric for the next 30 days.",
   },
 };
 
@@ -185,10 +182,24 @@ interface PackageCard {
   };
 }
 
+const severityCopy: Record<SeverityBand, string> = {
+  Critical:
+    "Keep it fast and simple. Stop the waste and focus on one clear move that stabilises momentum.",
+  Leaking:
+    "Simplify the plan and remove distractions. Consistency will come once the foundations are steady.",
+  Improving:
+    "You have the raw ingredients. Tighten execution and let the results compound over the next quarter.",
+  Healthy:
+    "You are in a good place. Focus on refinement and compounding rather than new initiatives.",
+};
+
 const RatingLegend = () => (
-  <div className="mt-4 flex flex-wrap gap-3 text-sm text-slate-600">
+  <div className="mt-4 flex flex-wrap gap-3 text-xs text-white/60">
     {scaleLabels.map((label, index) => (
-      <span key={label} className="rounded-full bg-slate-100 px-3 py-1">
+      <span
+        key={label}
+        className="rounded-full border border-white/10 bg-white/5 px-3 py-1"
+      >
         {index + 1} = {label}
       </span>
     ))}
@@ -196,19 +207,19 @@ const RatingLegend = () => (
 );
 
 const PackageCardView = ({ card }: { card: PackageCard }) => (
-  <div className="flex h-full flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+  <div className="flex h-full flex-col justify-between rounded-2xl border border-white/10 bg-white/5 p-6 shadow-[0_24px_60px_-40px_rgba(0,0,0,0.9)] backdrop-blur">
     <div>
-      <h4 className="text-lg font-semibold text-slate-900">{card.title}</h4>
-      <p className="mt-2 text-sm text-slate-600">{card.audience}</p>
-      <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-slate-700">
+      <h4 className="text-lg font-semibold text-white">{card.title}</h4>
+      <p className="mt-2 text-sm text-white/60">{card.audience}</p>
+      <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-white/70">
         {card.bullets.map((bullet) => (
           <li key={bullet}>{bullet}</li>
         ))}
       </ul>
-      <p className="mt-4 text-sm font-medium text-slate-800">Outcome: {card.outcome}</p>
+      <p className="mt-4 text-sm font-medium text-white/80">Outcome: {card.outcome}</p>
     </div>
     <a
-      className="mt-6 inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+      className="mt-6 inline-flex items-center justify-center rounded-full bg-[#ff7a1a] px-4 py-2 text-sm font-semibold text-[#0b0b0b] transition hover:bg-[#ff8c3a]"
       href={card.cta.href}
     >
       {card.cta.label}
@@ -221,6 +232,12 @@ const App = () => {
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   const resultsRef = useRef<HTMLDivElement | null>(null);
+  const formRef = useRef<HTMLDivElement | null>(null);
+
+  const questionsWithNumbers = useMemo(
+    () => questions.map((question, index) => ({ ...question, number: index + 1 })),
+    [],
+  );
 
   const allAnswered = questions.every((question) => answers[question.id]);
   const scores = useMemo(() => {
@@ -229,6 +246,13 @@ const App = () => {
     }
     return calculateScores(answers);
   }, [answers, hasSubmitted, allAnswered]);
+
+  const lowestQuestions = useMemo(() => {
+    if (!scores) {
+      return [];
+    }
+    return getLowestQuestions(answers, 3);
+  }, [answers, scores]);
 
   const handleAnswer = (id: string, value: number) => {
     setAnswers((prev) => ({ ...prev, [id]: value }));
@@ -255,205 +279,321 @@ const App = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const scrollToForm = () => {
+    formRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const primaryScore = scores
+    ? {
+        Soul: scores.soulAvg,
+        Heart: scores.heartAvg,
+        Hands: scores.handsAvg,
+      }[scores.primary]
+    : null;
+
+  const severity = primaryScore ? getSeverityBand(primaryScore) : null;
+
   return (
-    <div className="min-h-screen bg-slate-50 pb-20">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-5xl flex-col gap-4 px-6 py-10">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-            Marketing Reality Check
-          </p>
-          <h1 className="text-3xl font-semibold text-slate-900 md:text-4xl">
-            Marketing Reality Check
-          </h1>
-          <p className="max-w-2xl text-base text-slate-600 md:text-lg">
-            12 questions. Immediate diagnosis. Practical next steps.
-          </p>
-        </div>
-      </header>
+    <div className="relative min-h-screen overflow-hidden bg-[#050505] text-white">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0b0b0f] via-[#0a0f16] to-[#040404]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.08),_transparent_40%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,_rgba(0,0,0,0.8),_transparent_60%)]" />
+      </div>
 
-      <main className="mx-auto max-w-5xl px-6">
-        <section className="mt-10 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-10">
-          <div className="flex flex-col gap-2">
-            <h2 className="text-xl font-semibold text-slate-900">Score your reality</h2>
-            <p className="text-sm text-slate-600">
-              Rate each statement from 1 to 5. Be honest so the diagnosis is useful.
-            </p>
+      <div className="relative">
+        <header className="border-b border-white/10">
+          <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
+            <span className="text-lg font-semibold tracking-wide text-white">Rob Hutt</span>
+            <nav className="flex items-center gap-6 text-sm text-white/70">
+              <a className="transition hover:text-white" href="/work">
+                Work
+              </a>
+              <a className="transition hover:text-white" href="/contact">
+                Contact
+              </a>
+            </nav>
           </div>
-          <RatingLegend />
+        </header>
 
-          <form className="mt-8 space-y-8" onSubmit={handleSubmit}>
-            {questions.map((question, index) => (
-              <div
-                key={question.id}
-                className="rounded-2xl border border-slate-200 bg-slate-50 p-5 md:p-6"
-              >
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold text-slate-500">
-                      {question.pillar.toUpperCase()} · Q{index + 1}
-                    </p>
-                    {attemptedSubmit && !answers[question.id] ? (
-                      <span className="text-xs font-semibold text-rose-600">
-                        Required
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="text-base font-medium text-slate-900">{question.text}</p>
-                </div>
-                <div className="mt-4 grid gap-3 sm:grid-cols-5">
-                  {scaleLabels.map((label, optionIndex) => {
-                    const value = optionIndex + 1;
-                    const isChecked = answers[question.id] === value;
-                    return (
-                      <label
-                        key={`${question.id}-${value}`}
-                        className={`flex cursor-pointer flex-col items-center gap-2 rounded-xl border px-3 py-3 text-sm transition hover:border-slate-400 ${
-                          isChecked
-                            ? "border-slate-900 bg-white text-slate-900 shadow-sm"
-                            : "border-slate-200 bg-white text-slate-600"
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name={question.id}
-                          className="h-4 w-4 text-slate-900"
-                          value={value}
-                          checked={isChecked}
-                          onChange={() => handleAnswer(question.id, value)}
-                        />
-                        <span className="text-center text-xs font-medium">{label}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-
-            <div className="flex flex-col gap-3">
-              <button
-                type="submit"
-                className="inline-flex items-center justify-center rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-                disabled={!allAnswered}
-              >
-                See my diagnosis
-              </button>
-              {!allAnswered ? (
-                <p className="text-sm text-slate-500">
-                  Answer all 12 questions to see your results.
+        <main className="mx-auto w-full max-w-6xl px-6 pb-20">
+          <section className="pt-16">
+            <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.3em] text-white/50">
+                  Marketing Reality Check
                 </p>
-              ) : null}
-            </div>
-          </form>
-        </section>
-
-        <section ref={resultsRef} className="mt-12">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-10">
-            <h2 className="text-2xl font-semibold text-slate-900">Results</h2>
-            {!scores ? (
-              <p className="mt-3 text-sm text-slate-600">
-                Submit the scorecard to see your diagnosis, averages, and next steps.
-              </p>
-            ) : (
-              <div className="mt-6 space-y-8">
-                <div className="grid gap-4 md:grid-cols-4">
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-xs font-semibold uppercase text-slate-500">Soul avg</p>
-                    <p className="mt-2 text-2xl font-semibold text-slate-900">{scores.soulAvg}</p>
-                  </div>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-xs font-semibold uppercase text-slate-500">Heart avg</p>
-                    <p className="mt-2 text-2xl font-semibold text-slate-900">{scores.heartAvg}</p>
-                  </div>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-xs font-semibold uppercase text-slate-500">Hands avg</p>
-                    <p className="mt-2 text-2xl font-semibold text-slate-900">{scores.handsAvg}</p>
-                  </div>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-xs font-semibold uppercase text-slate-500">Alignment avg</p>
-                    <p className="mt-2 text-2xl font-semibold text-slate-900">{scores.alignAvg}</p>
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-sm font-semibold uppercase text-slate-500">
-                    Primary diagnosis
-                  </p>
-                  <h3 className="mt-2 text-2xl font-semibold text-slate-900">
-                    {diagnosisCopy[scores.primary].title}
-                  </h3>
-                  <div className="mt-4 space-y-4 text-sm text-slate-700">
-                    {diagnosisCopy[scores.primary].paragraphs.map((paragraph) => (
-                      <p key={paragraph}>{paragraph}</p>
-                    ))}
-                  </div>
-                  <p className="mt-4 text-sm font-semibold text-slate-600">
-                    Secondary issue: {scores.secondary.toUpperCase()}
-                  </p>
-                </div>
-
-                {scores.alignAvg <= 2.5 ? (
-                  <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
-                    Alignment is currently weak: strategy and execution are not reinforcing each
-                    other.
-                  </div>
-                ) : null}
-                {scores.alignAvg >= 4.0 ? (
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-                    Alignment looks strong: keep strategy and execution connected.
-                  </div>
-                ) : null}
-
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
-                    <h4 className="text-sm font-semibold uppercase text-slate-500">
-                      What this usually looks like
-                    </h4>
-                    <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-slate-700">
-                      {diagnosisCopy[scores.primary].looksLike.map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
-                    <h4 className="text-sm font-semibold uppercase text-slate-500">
-                      What fixes it
-                    </h4>
-                    <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-slate-700">
-                      {diagnosisCopy[scores.primary].fixes.map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-xl font-semibold text-slate-900">
-                    Recommended next step package
-                  </h3>
-                  <p className="mt-2 text-sm text-slate-600">
-                    Choose the path that fits your reality. Start with the recommended option or
-                    consider the alternative if you need extra delivery support.
-                  </p>
-                  <div className="mt-6 grid gap-6 md:grid-cols-2">
-                    <PackageCardView card={packageRecommendations[scores.primary].recommended} />
-                    <PackageCardView card={packageRecommendations[scores.primary].alternative} />
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-3">
+                <h1 className="mt-4 text-4xl font-semibold leading-tight text-white md:text-5xl">
+                  Marketing Reality Check
+                </h1>
+                <p className="mt-4 max-w-xl text-base text-white/70 md:text-lg">
+                  12 questions. Immediate diagnosis. Practical next steps.
+                </p>
+                <div className="mt-8 flex flex-wrap gap-4">
                   <button
                     type="button"
-                    className="inline-flex w-full items-center justify-center rounded-full border border-slate-300 px-6 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:text-slate-900"
-                    onClick={handleReset}
+                    onClick={scrollToForm}
+                    className="inline-flex items-center justify-center rounded-full bg-[#ff7a1a] px-6 py-3 text-sm font-semibold text-[#0b0b0b] transition hover:bg-[#ff8c3a]"
                   >
-                    Reset scorecard
+                    Start the scorecard →
                   </button>
+                  <a
+                    className="inline-flex items-center justify-center rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-white/80 transition hover:border-white/40 hover:text-white"
+                    href="/"
+                  >
+                    Back to site
+                  </a>
                 </div>
               </div>
-            )}
-          </div>
-        </section>
-      </main>
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-[0_30px_80px_-50px_rgba(0,0,0,0.9)] backdrop-blur md:p-8">
+                <h2 className="text-xl font-semibold text-white">How it works</h2>
+                <p className="mt-3 text-sm text-white/60">
+                  Score yourself honestly across the four pillars. You will get a clear diagnosis, the
+                  three answers that drove it, and the next step that fits your situation.
+                </p>
+                <div className="mt-6 grid gap-4">
+                  {questionSections.map((section) => (
+                    <div
+                      key={section.pillar}
+                      className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-white">{section.title}</p>
+                        <p className="text-xs text-white/50">{section.subtitle}</p>
+                      </div>
+                      <span className="text-sm font-semibold text-white/70">
+                        {section.pillar === "Soul" && "Q1-3"}
+                        {section.pillar === "Heart" && "Q4-6"}
+                        {section.pillar === "Hands" && "Q7-10"}
+                        {section.pillar === "Alignment" && "Q11-12"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section ref={formRef} className="mt-16 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-[0_30px_80px_-60px_rgba(0,0,0,0.9)] backdrop-blur md:p-10">
+            <div className="flex flex-col gap-2">
+              <h2 className="text-2xl font-semibold text-white">Score your reality</h2>
+              <p className="text-sm text-white/60">
+                Rate each statement from 1 to 5. Be honest so the diagnosis is useful.
+              </p>
+            </div>
+            <RatingLegend />
+
+            <form className="mt-8 space-y-10" onSubmit={handleSubmit}>
+              {questionSections.map((section) => {
+                const sectionQuestions = questionsWithNumbers.filter(
+                  (question) => question.pillar === section.pillar,
+                );
+
+                return (
+                  <div key={section.pillar} className="space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-white/40">
+                          {section.title}
+                        </p>
+                        <h3 className="text-lg font-semibold text-white">{section.subtitle}</h3>
+                      </div>
+                      <span className="text-xs font-semibold text-white/40">
+                        {sectionQuestions.length} questions
+                      </span>
+                    </div>
+
+                    {sectionQuestions.map((question) => (
+                      <div
+                        key={question.id}
+                        className="rounded-2xl border border-white/10 bg-[#0c0c0f]/80 p-5 shadow-[0_20px_50px_-40px_rgba(0,0,0,0.8)] md:p-6"
+                      >
+                        <div className="flex flex-col gap-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/50">
+                              {question.pillar.toUpperCase()} · Q{question.number}
+                            </p>
+                            {attemptedSubmit && !answers[question.id] ? (
+                              <span className="text-xs font-semibold text-[#ff7a1a]">Required</span>
+                            ) : null}
+                          </div>
+                          <p className="text-base font-medium text-white">{question.text}</p>
+                        </div>
+                        <div className="mt-4 flex items-center justify-between text-[11px] text-white/40">
+                          <span>Strongly Disagree (1)</span>
+                          <span>Strongly Agree (5)</span>
+                        </div>
+                        <div className="mt-4 grid gap-3 sm:grid-cols-5">
+                          {scaleLabels.map((label, optionIndex) => {
+                            const value = optionIndex + 1;
+                            const isChecked = answers[question.id] === value;
+                            return (
+                              <label
+                                key={`${question.id}-${value}`}
+                                className={`flex cursor-pointer flex-col items-center gap-2 rounded-xl border px-3 py-3 text-sm transition hover:border-white/40 ${
+                                  isChecked
+                                    ? "border-[#ff7a1a] bg-white/10 text-white shadow-[0_12px_30px_-20px_rgba(255,122,26,0.8)]"
+                                    : "border-white/10 bg-white/5 text-white/60"
+                                }`}
+                              >
+                                <input
+                                  type="radio"
+                                  name={question.id}
+                                  className="h-4 w-4 text-[#ff7a1a]"
+                                  value={value}
+                                  checked={isChecked}
+                                  onChange={() => handleAnswer(question.id, value)}
+                                />
+                                <span className="text-center text-xs font-medium">{label}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+
+              <div className="flex flex-col gap-3">
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center rounded-full bg-[#ff7a1a] px-6 py-3 text-sm font-semibold text-[#0b0b0b] transition hover:bg-[#ff8c3a] disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/40"
+                  disabled={!allAnswered}
+                >
+                  See my diagnosis
+                </button>
+                {!allAnswered ? (
+                  <p className="text-sm text-white/50">
+                    Answer all 12 questions to see your results.
+                  </p>
+                ) : null}
+              </div>
+            </form>
+          </section>
+
+          <section ref={resultsRef} className="mt-12">
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-[0_30px_80px_-60px_rgba(0,0,0,0.9)] backdrop-blur md:p-10">
+              <h2 className="text-2xl font-semibold text-white">Results</h2>
+              {!scores ? (
+                <p className="mt-3 text-sm text-white/60">
+                  Submit the scorecard to see your diagnosis and next steps.
+                </p>
+              ) : (
+                <div className="mt-6 space-y-8">
+                  <div className="rounded-3xl border border-white/10 bg-[#101018]/80 p-6 shadow-[0_30px_70px_-50px_rgba(0,0,0,0.9)] md:p-8">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/50">
+                          Primary diagnosis
+                        </p>
+                        <h3 className="mt-2 text-2xl font-semibold text-white">
+                          {diagnosisInsights[scores.primary].title}
+                        </h3>
+                      </div>
+                      {severity ? (
+                        <span className="rounded-full border border-white/20 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white/70">
+                          {severity}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="mt-6 space-y-3 text-sm text-white/70">
+                      <p>{diagnosisInsights[scores.primary].pattern}</p>
+                      <p>{diagnosisInsights[scores.primary].consequence}</p>
+                      <p className="text-white">Quick win: {diagnosisInsights[scores.primary].quickWin}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-4">
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <p className="text-xs font-semibold uppercase text-white/50">Soul avg</p>
+                      <p className="mt-2 text-2xl font-semibold text-white">{scores.soulAvg}</p>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <p className="text-xs font-semibold uppercase text-white/50">Heart avg</p>
+                      <p className="mt-2 text-2xl font-semibold text-white">{scores.heartAvg}</p>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <p className="text-xs font-semibold uppercase text-white/50">Hands avg</p>
+                      <p className="mt-2 text-2xl font-semibold text-white">{scores.handsAvg}</p>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <p className="text-xs font-semibold uppercase text-white/50">Alignment avg</p>
+                      <p className="mt-2 text-2xl font-semibold text-white">{scores.alignAvg}</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+                    <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/50">
+                      What drove this diagnosis
+                    </h4>
+                    <div className="mt-4 space-y-3">
+                      {lowestQuestions.map((item) => {
+                        const questionNumber =
+                          questionsWithNumbers.find((question) => question.id === item.id)
+                            ?.number ?? 0;
+                        return (
+                          <div
+                            key={item.id}
+                            className="flex flex-col gap-2 rounded-xl border border-white/10 bg-[#0b0b0f]/70 p-4 text-sm text-white/70"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-white/40">
+                                Q{questionNumber} · {item.pillar}
+                              </span>
+                              <span className="text-xs font-semibold text-white/60">
+                                Score {item.score}
+                              </span>
+                            </div>
+                            <p className="text-white/80">{item.text}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-4 text-sm text-white/60">
+                      These answers usually indicate the core issue is blocking momentum elsewhere.
+                    </p>
+                  </div>
+
+                  {scores.alignAvg <= 2.5 ? (
+                    <div className="rounded-2xl border border-[#ff7a1a]/30 bg-[#140b05]/80 p-5 text-sm text-white/70">
+                      Alignment is currently weak. Strategy and output are not reinforcing each other,
+                      so results stall quickly.
+                    </div>
+                  ) : null}
+                  {scores.alignAvg >= 4.0 ? (
+                    <div className="rounded-2xl border border-emerald-200/30 bg-emerald-950/50 p-5 text-sm text-emerald-100">
+                      Alignment looks strong. Strategy is showing up in the work, so keep it tight and
+                      consistent.
+                    </div>
+                  ) : null}
+
+                  <div>
+                    <h3 className="text-xl font-semibold text-white">Recommended next step</h3>
+                    <p className="mt-2 text-sm text-white/60">
+                      {severity ? severityCopy[severity] : "Choose the path that matches your reality."}
+                    </p>
+                    <div className="mt-6 grid gap-6 md:grid-cols-2">
+                      <PackageCardView card={packageRecommendations[scores.primary].recommended} />
+                      <PackageCardView card={packageRecommendations[scores.primary].alternative} />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3">
+                    <button
+                      type="button"
+                      className="inline-flex w-full items-center justify-center rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-white/70 transition hover:border-white/40 hover:text-white"
+                      onClick={handleReset}
+                    >
+                      Reset scorecard
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        </main>
+      </div>
     </div>
   );
 };
