@@ -3,7 +3,9 @@ import { questions, type Pillar } from "./data/questions";
 import {
   calculateScores,
   getLowestQuestions,
+  getPattern,
   getSeverityBand,
+  getThirtyDayRule,
   type PillarKey,
   type SeverityBand,
 } from "./utils/scoring";
@@ -231,8 +233,15 @@ const App = () => {
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
+  const [leadEmail, setLeadEmail] = useState("");
+  const [leadConsent, setLeadConsent] = useState(false);
+  const [leadStatus, setLeadStatus] = useState<"idle" | "submitting" | "success" | "error">(
+    "idle",
+  );
+  const [leadError, setLeadError] = useState("");
   const resultsRef = useRef<HTMLDivElement | null>(null);
   const formRef = useRef<HTMLDivElement | null>(null);
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   const questionsWithNumbers = useMemo(
     () => questions.map((question, index) => ({ ...question, number: index + 1 })),
@@ -276,6 +285,10 @@ const App = () => {
     setAnswers({});
     setHasSubmitted(false);
     setAttemptedSubmit(false);
+    setLeadEmail("");
+    setLeadConsent(false);
+    setLeadStatus("idle");
+    setLeadError("");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -292,6 +305,60 @@ const App = () => {
     : null;
 
   const severity = primaryScore ? getSeverityBand(primaryScore) : null;
+  const showSeverityNote = severity === "Critical" || severity === "Leaking";
+  const alignmentSupplement = scores
+    ? {
+        Heart: "This is common when trust signals are weak: strategy exists, but people don’t feel it.",
+        Soul: "This is common when direction is unclear: output becomes reactive.",
+        Hands: "This is common when there is no system: good strategy never shows up consistently.",
+      }[scores.primary]
+    : "";
+  const isLeadSuccess = leadStatus === "success";
+  const isLeadSubmitting = leadStatus === "submitting";
+  const emailIsValid = emailRegex.test(leadEmail);
+
+  const handleLeadSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!scores || !severity || !emailIsValid || !leadConsent) {
+      return;
+    }
+
+    setLeadStatus("submitting");
+    setLeadError("");
+
+    const payload = {
+      email: leadEmail,
+      answers: questions.map((question) => answers[question.id]),
+      primaryDiagnosis: scores.primary,
+      severity,
+      pillarAverages: {
+        soul: scores.soulAvg,
+        heart: scores.heartAvg,
+        hands: scores.handsAvg,
+        alignment: scores.alignAvg,
+      },
+      lowest3: lowestQuestions.map(({ id, score }) => ({ id, score })),
+    };
+
+    try {
+      const response = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error("Lead capture failed");
+      }
+
+      setLeadStatus("success");
+    } catch (error) {
+      console.error(error);
+      setLeadStatus("error");
+      setLeadError("Something went wrong. Please try again.");
+    }
+  };
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#050505] text-white">
@@ -490,17 +557,31 @@ const App = () => {
                         <h3 className="mt-2 text-2xl font-semibold text-white">
                           {diagnosisInsights[scores.primary].title}
                         </h3>
+                        {severity ? (
+                          <p className="mt-2 text-sm text-white/60">
+                            Pattern: {getPattern(scores.primary, severity)}
+                          </p>
+                        ) : null}
                       </div>
                       {severity ? (
-                        <span className="rounded-full border border-white/20 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white/70">
-                          {severity}
-                        </span>
+                        <div className="text-right">
+                          <span className="rounded-full border border-white/20 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white/70">
+                            {severity}
+                          </span>
+                          {showSeverityNote ? (
+                            <p className="mt-3 text-xs text-white/50">
+                              Left unchecked, this usually stalls growth even if spend increases.
+                            </p>
+                          ) : null}
+                        </div>
                       ) : null}
                     </div>
                     <div className="mt-6 space-y-3 text-sm text-white/70">
                       <p>{diagnosisInsights[scores.primary].pattern}</p>
                       <p>{diagnosisInsights[scores.primary].consequence}</p>
-                      <p className="text-white">Quick win: {diagnosisInsights[scores.primary].quickWin}</p>
+                      <p className="text-white">
+                        30-day rule: {getThirtyDayRule(scores.primary)}
+                      </p>
                     </div>
                   </div>
 
@@ -558,7 +639,7 @@ const App = () => {
                   {scores.alignAvg <= 2.5 ? (
                     <div className="rounded-2xl border border-[#ff7a1a]/30 bg-[#140b05]/80 p-5 text-sm text-white/70">
                       Alignment is currently weak. Strategy and output are not reinforcing each other,
-                      so results stall quickly.
+                      so results stall quickly. {alignmentSupplement}
                     </div>
                   ) : null}
                   {scores.alignAvg >= 4.0 ? (
@@ -577,6 +658,67 @@ const App = () => {
                       <PackageCardView card={packageRecommendations[scores.primary].recommended} />
                       <PackageCardView card={packageRecommendations[scores.primary].alternative} />
                     </div>
+                  </div>
+
+                  <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-[0_24px_60px_-50px_rgba(0,0,0,0.9)]">
+                    <h3 className="text-xl font-semibold text-white">
+                      Get your full 30–90 day action plan
+                    </h3>
+                    <p className="mt-2 text-sm text-white/60">
+                      If you want the step-by-step roadmap for this diagnosis, we’ll email it to you.
+                      You can use it yourself or bring it to a call.
+                    </p>
+                    <form className="mt-6 space-y-4" onSubmit={handleLeadSubmit}>
+                      <label className="block text-sm text-white/70">
+                        Email
+                        <input
+                          type="email"
+                          name="email"
+                          required
+                          value={leadEmail}
+                          onChange={(event) => {
+                            setLeadEmail(event.target.value);
+                            if (leadStatus !== "idle") {
+                              setLeadStatus("idle");
+                              setLeadError("");
+                            }
+                          }}
+                          className="mt-2 w-full rounded-2xl border border-white/10 bg-[#0b0b0f]/70 px-4 py-3 text-sm text-white outline-none transition focus:border-[#ff7a1a]"
+                          placeholder="you@company.com"
+                        />
+                      </label>
+                      <label className="flex items-start gap-3 text-sm text-white/70">
+                        <input
+                          type="checkbox"
+                          required
+                          checked={leadConsent}
+                          onChange={(event) => {
+                            setLeadConsent(event.target.checked);
+                            if (leadStatus !== "idle") {
+                              setLeadStatus("idle");
+                              setLeadError("");
+                            }
+                          }}
+                          className="mt-1 h-4 w-4 rounded border-white/20 bg-transparent text-[#ff7a1a]"
+                        />
+                        <span>I agree to be emailed my results and occasional follow-ups.</span>
+                      </label>
+                      <button
+                        type="submit"
+                        disabled={!emailIsValid || !leadConsent || isLeadSubmitting || isLeadSuccess}
+                        className="inline-flex items-center justify-center rounded-full bg-[#ff7a1a] px-6 py-3 text-sm font-semibold text-[#0b0b0b] transition hover:bg-[#ff8c3a] disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/40"
+                      >
+                        {isLeadSubmitting ? "Sending..." : "Email me the action plan"}
+                      </button>
+                      {isLeadSuccess ? (
+                        <p className="text-sm text-emerald-200">
+                          Done. Check your inbox in a minute.
+                        </p>
+                      ) : null}
+                      {leadStatus === "error" ? (
+                        <p className="text-sm text-[#ff7a1a]">{leadError}</p>
+                      ) : null}
+                    </form>
                   </div>
 
                   <div className="flex flex-col gap-3">
