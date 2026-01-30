@@ -2,3 +2,10 @@ node_modules
 /dist
 /server-dist
 .vite
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Vite build outputs
+vite.config.d.ts
+vite.config.js
